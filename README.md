@@ -1,10 +1,9 @@
 It is a bot to play mega chess, it was made for an Eventbrite preselection.
 
-It is created in Javascript to connect with a server through websocket.
+It is created in Javascript to connect with a websocket located on the server.
 The bot receives different events from the server, including the corresponding turn.
 with the update of the board, the bot will be in charge of looking for the best
 possible move to respond with the initial and final squares of the movement.
-
 On each turn the board is received along with the corresponding color of pieces.
 The bot will find the best move to respond to the server in a given time.
 
