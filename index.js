@@ -15,7 +15,8 @@ function lisentMessage(msg) {
 
     switch (msg.event) {
         case "update_user_list":
-            console.log("Jugadores online:", msg.data.users_list)
+            console.log("Jugadores online:")
+            msg.data.users_list.map(u => console.log('*', u))
 
             return
 
@@ -63,6 +64,8 @@ function lisentMessage(msg) {
             console.log(msg.data.white_username, ' puntos:', msg.data.white_score)
             console.log(msg.data.black_username, ' puntos:', msg.data.black_score)
 
+            send('get_connected_users', {})
+
             return
 
         default:
@@ -82,8 +85,8 @@ function movePiece(board, turn) {
     Call 'divideByColor' to divide the board by colors.
     Call 'assingColors' to divide your own pieces and those of your opponents by color.
     It will also look for the opponent's attack moves.
-    Call 'searchBestMove' to get the starting and ending square of the move.
-    Call 'changeForRowAndCol' to get the corresponding rows and columns from both squares.
+    Call 'getTheBestMove' to get the starting and ending square of the move.
+    Call 'getMoveCoords' to get the corresponding rows and columns from both squares.
 
     Parameters: board(str) turn(str)
 
@@ -96,15 +99,15 @@ function movePiece(board, turn) {
 
     const chess = assingColors(board, colors.piecesBlacks, colors.piecesWhites, turn);
 
-    let move = searchBestMove(
+    let move = getTheBestMove(
         board,
-        chess.movedOponent,
+        chess.oponentMoves,
         chess.myPieces,
         chess.oponentPieces,
         turn
     );
 
-    return changeForRowAndCol(move);
+    return getMoveCoords(move);
 }
 
 function divideByColor(board) {
@@ -121,8 +124,12 @@ function divideByColor(board) {
     let piecesWhites = []
 
     for (let i = 0; i < board.length; i++) {
+        
         if (board[i] != ' ')
-            board[i] === board[i].toUpperCase() ? piecesWhites.push(i) : piecesBlacks.push(i)
+            board[i] === board[i].toUpperCase() ?
+                piecesWhites.push(i)
+                :
+                piecesBlacks.push(i)
     }
 
     return { piecesBlacks, piecesWhites }
@@ -132,8 +139,8 @@ function assingColors(board, piecesBlacks, piecesWhites, turn) {
 
     /*
     According to the turn, it assigns its own pieces and rival pieces the corresponding color.
-    Call 'searchMoves' in charge of  look for possible opponent's moves.
-    Map the array of rival pieces and call 'searchMoves' to get the possible moves on the next turn.
+    Call 'getPossibleMoves' in charge of  look for possible opponent's moves.
+    Map the array of rival pieces and call 'getPossibleMoves' to get the possible moves on the next turn.
     
     Parameters: board(str) blacksr (array) whites (array) turn(str)
 
@@ -142,37 +149,37 @@ function assingColors(board, piecesBlacks, piecesWhites, turn) {
 
     let myPieces = []
     let oponentPieces = []
-    let movedOponent = []
-    let anotherTurn
+    let oponentMoves = []
+    let oponentTurn
     let auxiliar
 
     if (turn == 'B') {
-        anotherTurn = 'W'
+        oponentTurn = 'W'
         myPieces = piecesBlacks
         oponentPieces = piecesWhites
     } else {
-        anotherTurn = 'B'
+        oponentTurn = 'B'
         myPieces = piecesWhites
         oponentPieces = piecesBlacks
     }
 
 
-    oponentPieces.map(op => {
-        auxiliar = searchMoves(
-            movedOponent,
+    oponentPieces.map(oponentSquare => {
+        auxiliar = getPossibleMoves(
+            oponentMoves,
             oponentPieces,
             myPieces,
-            board[op].toUpperCase(),
-            op,
-            anotherTurn
+            board[oponentSquare].toUpperCase(),
+            oponentSquare,
+            oponentTurn
         )
-        movedOponent = movedOponent.concat(auxiliar)
+        oponentMoves = oponentMoves.concat(auxiliar)
     })
 
-    return { myPieces, oponentPieces, movedOponent }
+    return { myPieces, oponentPieces, oponentMoves }
 }
 
-function searchMoves(moved, pieces, piecesAnotherTurn, piece, square, turn) {
+function getPossibleMoves(currentMoves, pieces, piecesAnotherTurn, piece, square, turn) {
 
     /*
     Identify the piece and call the functions in charge of looking for its possible movements.
@@ -185,33 +192,33 @@ function searchMoves(moved, pieces, piecesAnotherTurn, piece, square, turn) {
 
     switch (piece) {
         case 'K':
-            return movementKing(moved, pieces, square)
+            return getKingMoves(currentMoves, pieces, square)
 
         case 'P':
-            return movementPawn(moved, pieces, piecesAnotherTurn, square, turn)
+            return getPawnMoves(currentMoves, pieces, piecesAnotherTurn, square, turn)
 
         case 'H':
-            return movementHorse(moved, pieces, square)
+            return getHorseMoves(currentMoves, pieces, square)
 
         case 'B':
-            return diagonals(moved, pieces, piecesAnotherTurn, square)
+            return getDiagonalsMoves(currentMoves, pieces, piecesAnotherTurn, square)
 
         case 'R':
-            return verticalAndHorizontal(moved, pieces, piecesAnotherTurn, square)
+            return getStraightLineMoves(currentMoves, pieces, piecesAnotherTurn, square)
 
         case 'Q':
-            let movements = verticalAndHorizontal(moved, pieces, piecesAnotherTurn, square)
-            let diagonal = diagonals(moved, pieces, piecesAnotherTurn, square)
+            let moves = getStraightLineMoves(currentMoves, pieces, piecesAnotherTurn, square)
+            let diagonals = getDiagonalsMoves(currentMoves, pieces, piecesAnotherTurn, square)
 
-            return movements.concat(diagonal)
+            return moves.concat(diagonals)
     }
 }
 
-function movementKing(moved, pieces, square) {
+function getKingMoves(currentMoves, pieces, square) {
 
     /*
     The eight possible moves of a king are assigned, they are added by group.
-    'verticalMargins' is called, a function that verifies that the movement is within the lateral margins.
+    'checkMarginsY' is called, a function that verifies that the movement is within the lateral margins.
     Filter: non-repeated movements, not occupied by the same color and within horizontal margins.
 
     Parameters: possible piece movements(array) board(str) pieces color of turn(array)
@@ -220,24 +227,24 @@ function movementKing(moved, pieces, square) {
     return: possible piece movements(array)
     */
 
-    let possible = [square - 16, square + 16]
+    let moves = [square - 16, square + 16]
 
-    let steps = [square - 15, square - 1, square + 17]
+    let otherMoves = [square - 15, square - 1, square + 17]
 
-    if (verticalMargins(square, -1)) possible = possible.concat(steps)
+    if (checkMarginsY(square, -1)) moves = moves.concat(otherMoves)
 
-    steps = [square - 17, square + 1, square + 15]
+    otherMoves = [square - 17, square + 1, square + 15]
 
-    if (verticalMargins(square, 1)) possible = possible.concat(steps)
+    if (checkMarginsY(square, 1)) moves = moves.concat(otherMoves)
 
-    possible = possible.filter(p =>
-        (horizontalMargins(p) && !moved.includes(p) && !pieces.includes(p))
+    moves = moves.filter(move =>
+        (checkMarginsX(move) && !currentMoves.includes(move) && !pieces.includes(move))
     )
 
-    return possible
+    return moves
 }
 
-function movementPawn(moved, pieces, piecesAnotherTurn, square, turn) {
+function getPawnMoves(currentMoves, pieces, piecesAnotherTurn, square, turn) {
 
     /*
     The color of the pawn is identified and a JSON;
@@ -245,7 +252,7 @@ function movementPawn(moved, pieces, piecesAnotherTurn, square, turn) {
     It is verified that the movements are valid when assigning them in the JSON.
     It is verified that the pawn can advance one or two steps (if applicable).
     It is vedified that the pawn can eat diagonally.
-    'CheckOnBoard' and 'verticalMargins' are called to verify that the moves do not leave the board.
+    'CheckOnBoard' and 'checkMarginsY' are called to verify that the moves do not leave the board.
     Filter: non-repeated movements.
 
     Parameter: possible piece movements(array) pieces color of turn(array) square(int) turn(str)
@@ -253,45 +260,45 @@ function movementPawn(moved, pieces, piecesAnotherTurn, square, turn) {
     return: possible piece movements(array)
     */
 
-    let possible = {}
-    let newMoved = []
+    let pawnMoves = {}
+    let moves = []
 
     if (turn == 'W') {
-        possible = {
+        pawnMoves = {
             single: square - 16,
             double: square > 191 ? square - 32 : 256,
-            eatLeft: verticalMargins(square, -1) ? square - 17 : 256,
-            eatRight: verticalMargins(square, 1) ? square - 15 : 256
+            eatLeft: checkMarginsY(square, -1) ? square - 17 : 256,
+            eatRight: checkMarginsY(square, 1) ? square - 15 : 256
         }
     } else {
-        possible = {
+        pawnMoves = {
             single: square + 16,
             double: square < 64 ? square + 32 : 256,
-            eatLeft: verticalMargins(square, -1) ? square + 17 : 256,
-            eatRight: verticalMargins(square, 1) ? square + 15 : 256
+            eatLeft: checkMarginsY(square, -1) ? square + 17 : 256,
+            eatRight: checkMarginsY(square, 1) ? square + 15 : 256
         }
     }
 
-    if (!pieces.includes(possible.single)) {
+    if (!pieces.includes(pawnMoves.single)) {
 
-        newMoved.push(possible.single)
+        moves.push(pawnMoves.single)
 
-        if (pieces.includes(possible.double)) newMoved.push(possible.double)
+        if (pieces.includes(pawnMoves.double)) moves.push(pawnMoves.double)
     }
 
-    if (piecesAnotherTurn.includes(possible.eatLeft)) newMoved.push(possible.eatLeft)
+    if (piecesAnotherTurn.includes(pawnMoves.eatLeft)) moves.push(pawnMoves.eatLeft)
 
-    if (piecesAnotherTurn.includes(possible.eatRight)) newMoved.push(possible.eatRight)
+    if (piecesAnotherTurn.includes(pawnMoves.eatRight)) moves.push(pawnMoves.eatRight)
 
-    return newMoved.filter(n => horizontalMargins(n) && !moved.includes(n))
+    return moves.filter(move => checkMarginsX(move) && !currentMoves.includes(move))
 }
 
-function movementHorse(moved, pieces, square) {
+function getHorseMoves(currentMoves, pieces, square) {
 
     /*
-    Start with the eight possible movements of a horse divided into four groups,
+    getDtart witMovesh the eight possible movements of a horse divided into four groups,
     according to how many squares it moves to the right or left
-    'verticalMargins' is called to verify that the movements are within the lateral margins.
+    'checkMarginsY' is called to verify that the movements are within the lateral margins.
     Filter: non-repeated movements, not occupied by the same color and within horizontal margins.
 
     Parameter: possible piece movements(array) square(int) turn(str)
@@ -299,24 +306,24 @@ function movementHorse(moved, pieces, square) {
     return: possible piece movements(array)
     */
 
-    let possible = []
+    let moves = []
 
-    if (verticalMargins(square, -1)) possible = possible.concat(square - 33, square + 31)
+    if (checkMarginsY(square, -1)) moves = moves.concat(square - 33, square + 31)
 
-    if (verticalMargins(square, -2)) possible = possible.concat(square - 18, square + 14)
+    if (checkMarginsY(square, -2)) moves = moves.concat(square - 18, square + 14)
 
-    if (verticalMargins(square, 2)) possible = possible.concat(square - 14, square + 18)
+    if (checkMarginsY(square, 2)) moves = moves.concat(square - 14, square + 18)
 
-    if (verticalMargins(square, 1)) possible = possible.concat(square - 31, square + 33)
+    if (checkMarginsY(square, 1)) moves = moves.concat(square - 31, square + 33)
 
-    possible = possible.filter(p =>
-        (!pieces.includes(p) && horizontalMargins(p) && !moved.includes(p))
+    moves = moves.filter(move =>
+        (!pieces.includes(move) && checkMarginsX(move) && !currentMoves.includes(move))
     )
 
-    return possible
+    return moves
 }
 
-function diagonals(moved, pieces, piecesAnotherTurn, square) {
+function getDiagonalsMoves(currentMoves, pieces, piecesAnotherTurn, square) {
 
     /*
     Function that works for both bishops and queens, looks for the diagonal movements of the piece
@@ -329,15 +336,23 @@ function diagonals(moved, pieces, piecesAnotherTurn, square) {
     return: possible piece movements(array)
     */
 
-    let possible = []
-    let steps = [-17, -15, 15, 17]
+    let moves = []
+    let segmentDirections = [-17, -15, 15, 17]
 
-    possible = possible.concat(nextStep(moved, pieces, piecesAnotherTurn, square, steps))
+    moves = moves.concat(
+        getSegments(
+            currentMoves,
+            pieces,
+            piecesAnotherTurn,
+            square,
+            segmentDirections
+        )
+    )
 
-    return possible
+    return moves
 }
 
-function verticalAndHorizontal(moved, pieces, piecesAnotherTurn, square) {
+function getStraightLineMoves(currentMoves, pieces, piecesAnotherTurn, square) {
 
     /*
     Function that works for both towers and queens,
@@ -350,20 +365,28 @@ function verticalAndHorizontal(moved, pieces, piecesAnotherTurn, square) {
     return: possible piece movements(array)
     */
 
-    let possible = []
-    let steps = [-16, -1, 1, 16]
+    let moves = []
+    let segmentDirections = [-16, -1, 1, 16]
 
-    possible = possible.concat(nextStep(moved, pieces, piecesAnotherTurn, square, steps))
+    moves = moves.concat(
+        getSegments(
+            currentMoves,
+            pieces,
+            piecesAnotherTurn,
+            square,
+            segmentDirections
+        )
+    )
 
-    return possible
+    return moves
 }
 
-function nextStep(moved, pieces, piecesAnotherTurn, square, steps) {
+function getSegments(currentMoves, pieces, piecesAnotherTurn, square, segmentDirections) {
 
     /*
     Function that looks for movements in a given direction.
     It goes through a segment in the same direction as long as it stays inside the board.
-    Use the 'horizontalMargins' and 'verticalMargins' functions to ensure that moves are within the board.
+    Use the 'checkMarginsX' and 'checkMarginsY' functions to ensure that moves are within the board.
     Filtered: non-repeated movement and squares not occupied by the same color.
     If there is a rival piece on the destination square, the move is added but the segment is cut.
 
@@ -373,41 +396,41 @@ function nextStep(moved, pieces, piecesAnotherTurn, square, steps) {
     return: possible piece movements(array)
     */
 
-    let possible = []
+    let moves = []
     let direction
 
-    steps.map(step => {
+    segmentDirections.map(goTo => {
 
-        if (step == -17 || step == -1 || step == 15) {
+        if (goTo == -17 || goTo == -1 || goTo == 15) {
             direction = -1
         } else {
-            (step == 16 || step == -16) ? direction = 0 : direction = 1
+            (goTo == 16 || goTo == -16) ? direction = 0 : direction = 1
         }
 
-        let move = square + step
-        let toContinue = verticalMargins(square, direction)
+        let move = square + goTo
+        let nextStep = checkMarginsY(square, direction)
 
-        while (toContinue && horizontalMargins(move) && !pieces.includes(move)) {
+        while (nextStep && checkMarginsX(move) && !pieces.includes(move)) {
 
-            if (!moved.includes(move)) possible.push(move)
+            if (!currentMoves.includes(move)) moves.push(move)
 
-            toContinue = (!piecesAnotherTurn.includes(move) && verticalMargins(move, direction))
+            nextStep = (!piecesAnotherTurn.includes(move) && checkMarginsY(move, direction))
 
-            move = move + step
+            move = move + goTo
         }
     })
 
-    return possible
+    return moves
 }
 
-function searchBestMove(board, movedOponent, pieces, piecesAnotherTurn, turn) {
+function getTheBestMove(board, oponentMoves, pieces, piecesAnotherTurn, turn) {
 
     /*
     'bestMove', 'pieceToMove' and 'moveTowards' are instantiated 
     The array of proper pieces is mapped and three functions are called:
-    'searchPoint' to find the score of each piece
-    'searchMoves' to search for their possible moves.
-    'selectMove' to find the most appropriate movement
+    'getPiecePoints' to find the score of each piece
+    'getPossibleMoves' to search for their possible moves.
+    'selectTheBestMove' to find the most appropriate movement
 
     Parameters: board(str) moves of rival pieces(array) pieces color of turn(array)
     pices another color(array) turn(str)
@@ -423,7 +446,7 @@ function searchBestMove(board, movedOponent, pieces, piecesAnotherTurn, turn) {
     pieces.map(square => {
         const piece = board[square].toUpperCase()
 
-        let movements = searchMoves(
+        let moves = getPossibleMoves(
             [],
             pieces,
             piecesAnotherTurn,
@@ -433,10 +456,10 @@ function searchBestMove(board, movedOponent, pieces, piecesAnotherTurn, turn) {
         )
 
         if (!captured) {
-            let move = selectMove(
+            let move = selectTheBestMove(
                 bestMove,
-                movements,
-                movedOponent,
+                moves,
+                oponentMoves,
                 moveTowards,
                 piece,
                 piecesAnotherTurn,
@@ -464,7 +487,65 @@ function searchBestMove(board, movedOponent, pieces, piecesAnotherTurn, turn) {
     return { pieceToMove, moveTowards }
 }
 
-function searchPoint(piece) {
+function selectTheBestMove(
+    bestMove,
+    moves,
+    oponentMoves,
+    moveTowards,
+    piece,
+    piecesAnotherTurn,
+    pieceToMove,
+    square,
+    turn
+) {
+
+    /*
+    Search among the possible movements which is the best option.
+    Call 'canICapture' to see if I could eat the rival piece.
+    If the piece is a pawn, call 'isCrowned' to check if it can be promoted.
+    It is verified if the piece can be eaten in the next movement.
+    For each move we compare the 'bestMove' with the score obtained,
+    If the score is higher, it is replaced along with 'pieceToMove' and 'moveTowards'.
+    
+    Parameters: bestMove(int) board(str) possible piece movements(array)
+    moves of rival pieces(array) destination square(int) pices another color(array)
+    initial square(int) score(int) square(int) turn(str)
+    
+    return: JSON: best move, initial square and destination square(JSON)
+    */
+
+    const pointPiece = getPiecePoints(piece)
+    let captured = false
+    let bestScore = bestMove
+    let initial = pieceToMove
+    let destiny = moveTowards
+
+    moves.map(move => {
+        let partialPoints = pointPiece
+
+        if (!captured) {
+            if (piecesAnotherTurn.includes(move)) captured = true
+
+            if (captured) {
+                initial = square
+                destiny = move
+
+            } else {
+                partialPoints = getMovePoints(move, oponentMoves, partialPoints, piece, turn)
+
+                if (partialPoints > bestScore) {
+                    bestScore = partialPoints
+                    initial = square
+                    destiny = move
+                }
+            }
+        }
+    })
+
+    return { bestMove: bestScore, captured, pieceToMove: initial, moveTowards: destiny }
+}
+
+function getPiecePoints(piece) {
 
     /*
     Find the score corresponding to the piece.
@@ -495,84 +576,25 @@ function searchPoint(piece) {
     }
 }
 
-function selectMove(
-    bestMove,
-    movements,
-    movedOponent,
-    moveTowards,
-    piece,
-    piecesAnotherTurn,
-    pieceToMove,
-    square,
-    turn
-) {
-
-    /*
-    Search among the possible movements which is the best option.
-    Call 'canICapture' to see if I could eat the rival piece.
-    If the piece is a pawn, call 'crowned' to check if it can be promoted.
-    It is verified if the piece can be eaten in the next movement.
-    For each move we compare the 'bestMove' with the score obtained,
-    If the score is higher, it is replaced along with 'pieceToMove' and 'moveTowards'.
-    
-    Parameters: bestMove(int) board(str) possible piece movements(array)
-    moves of rival pieces(array) destination square(int) pices another color(array)
-    initial square(int) score(int) square(int) turn(str)
-    
-    return: JSON: best move, initial square and destination square(JSON)
-    */
-
-    const pointPiece = searchPoint(piece)
-    let captured = false
-    let bestScore = bestMove
-    let initial = pieceToMove
-    let destiny = moveTowards
-
-    movements.map(move => {
-        let partialPoints = pointPiece
-
-        if (!captured) {
-            if (piecesAnotherTurn.includes(move)) captured = true
-
-            if (captured) {
-                bestScore = 2000
-                initial = square
-                destiny = move
-
-            } else {
-                partialPoints = lookUpScore(move, movedOponent, partialPoints, piece, turn)
-
-                if (partialPoints > bestScore) {
-                    bestScore = partialPoints
-                    initial = square
-                    destiny = move
-                }
-            }
-        }
-    })
-
-    return { bestMove: bestScore, captured, pieceToMove: initial, moveTowards: destiny }
-}
-
-function lookUpScore(move, movedOponent, partialPoints, piece, turn) {
+function getMovePoints(move, oponentMoves, partialPoints, piece, turn) {
 
     let pieceValue = partialPoints
     let partialScore = partialPoints
 
-    if (piece == 'P' && crowned(move, turn)) {
+    if (piece == 'P' && isCrowned(move, turn)) {
         partialScore = 50
         pieceValue = 5
     }
 
-    if (movedOponent.includes(move)) partialScore = partialScore - pieceValue * 10
+    if (oponentMoves.includes(move)) partialScore = partialScore - pieceValue * 10
 
     return partialScore
 }
 
-function crowned(move, color) {
+function isCrowned(move, color) {
 
     /*
-    Checks if the received pawn can be crowned on the given move.
+    Checks if the received pawn can be isCrowned on the given move.
 
     Parameter: movement(int) color(str)
 
@@ -586,14 +608,14 @@ function crowned(move, color) {
     return false
 }
 
-function horizontalMargins(square) {
+function checkMarginsX(square) {
 
     return (square < 256 && square > (-1))
 }
 
-function verticalMargins(square, step) {
+function checkMarginsY(square, yDirection) {
 
-    switch (step) {
+    switch (yDirection) {
         case -1:
             return (square % 16) > 0 ? true : false
 
@@ -611,7 +633,7 @@ function verticalMargins(square, step) {
     }
 }
 
-function changeForRowAndCol(move) {
+function getMoveCoords(move) {
 
     /*
     Parameter: initial and destination squares(JSON)
@@ -619,19 +641,19 @@ function changeForRowAndCol(move) {
     */
 
     return {
-        from_col: searchCol(move.pieceToMove),
-        from_row: searchRow(move.pieceToMove),
-        to_col: searchCol(move.moveTowards),
-        to_row: searchRow(move.moveTowards)
+        from_col: getCol(move.pieceToMove),
+        from_row: getRow(move.pieceToMove),
+        to_col: getCol(move.moveTowards),
+        to_row: getRow(move.moveTowards)
     }
 }
 
-function searchCol(square) {
+function getCol(square) {
     return square % 16
 }
 
-function searchRow(square) {
-    return (square - searchCol(square)) / 16
+function getRow(square) {
+    return (square - getCol(square)) / 16
 }
 
 function printBoard(board) {
