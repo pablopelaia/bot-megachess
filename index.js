@@ -1,5 +1,4 @@
 const MY_TOKEN = 'd8f03c50-5872-4c72-ada2-6263a5121d37'
-
 const ws = new WebSocket(`ws://megachess.herokuapp.com/service?authtoken=${MY_TOKEN}`)
 
 ws.onopen = () => {
@@ -124,12 +123,10 @@ function divideByColor(board) {
     let piecesWhites = []
 
     for (let i = 0; i < board.length; i++) {
-        
+
         if (board[i] != ' ')
             board[i] === board[i].toUpperCase() ?
-                piecesWhites.push(i)
-                :
-                piecesBlacks.push(i)
+                piecesWhites.push(i) : piecesBlacks.push(i)
     }
 
     return { piecesBlacks, piecesWhites }
@@ -151,7 +148,6 @@ function assingColors(board, piecesBlacks, piecesWhites, turn) {
     let oponentPieces = []
     let oponentMoves = []
     let oponentTurn
-    let auxiliar
 
     if (turn == 'B') {
         oponentTurn = 'W'
@@ -165,7 +161,7 @@ function assingColors(board, piecesBlacks, piecesWhites, turn) {
 
 
     oponentPieces.map(oponentSquare => {
-        auxiliar = getPossibleMoves(
+        oponentMoves = getPossibleMoves(
             oponentMoves,
             oponentPieces,
             myPieces,
@@ -173,7 +169,6 @@ function assingColors(board, piecesBlacks, piecesWhites, turn) {
             oponentSquare,
             oponentTurn
         )
-        oponentMoves = oponentMoves.concat(auxiliar)
     })
 
     return { myPieces, oponentPieces, oponentMoves }
@@ -208,9 +203,7 @@ function getPossibleMoves(currentMoves, pieces, piecesAnotherTurn, piece, square
 
         case 'Q':
             let moves = getStraightLineMoves(currentMoves, pieces, piecesAnotherTurn, square)
-            let diagonals = getDiagonalsMoves(currentMoves, pieces, piecesAnotherTurn, square)
-
-            return moves.concat(diagonals)
+            return getDiagonalsMoves(moves, pieces, piecesAnotherTurn, square)
     }
 }
 
@@ -229,19 +222,15 @@ function getKingMoves(currentMoves, pieces, square) {
 
     let moves = [square - 16, square + 16]
 
-    let otherMoves = [square - 15, square - 1, square + 17]
+    if (checkMarginsY(square, -1)) moves = moves.concat(square - 15, square - 1, square + 17)
 
-    if (checkMarginsY(square, -1)) moves = moves.concat(otherMoves)
-
-    otherMoves = [square - 17, square + 1, square + 15]
-
-    if (checkMarginsY(square, 1)) moves = moves.concat(otherMoves)
+    if (checkMarginsY(square, 1)) moves = moves.concat(square - 17, square + 1, square + 15)
 
     moves = moves.filter(move =>
         (checkMarginsX(move) && !currentMoves.includes(move) && !pieces.includes(move))
     )
 
-    return moves
+    return currentMoves.concat(moves)
 }
 
 function getPawnMoves(currentMoves, pieces, piecesAnotherTurn, square, turn) {
@@ -279,18 +268,21 @@ function getPawnMoves(currentMoves, pieces, piecesAnotherTurn, square, turn) {
         }
     }
 
-    if (!pieces.includes(pawnMoves.single)) {
+    if (!pieces.includes(pawnMoves.single) && !piecesAnotherTurn.includes(pawnMoves.single)) {
 
         moves.push(pawnMoves.single)
 
-        if (pieces.includes(pawnMoves.double)) moves.push(pawnMoves.double)
+        if (!pieces.includes(pawnMoves.double) && !piecesAnotherTurn.includes(pawnMoves.double))
+            moves.push(pawnMoves.double)
     }
 
-    if (piecesAnotherTurn.includes(pawnMoves.eatLeft)) moves.push(pawnMoves.eatLeft)
+    if (piecesAnotherTurn.includes(pawnMoves.eatLeft)) !moves.push(pawnMoves.eatLeft)
 
-    if (piecesAnotherTurn.includes(pawnMoves.eatRight)) moves.push(pawnMoves.eatRight)
+    if (piecesAnotherTurn.includes(pawnMoves.eatRight)) !moves.push(pawnMoves.eatRight)
 
-    return moves.filter(move => checkMarginsX(move) && !currentMoves.includes(move))
+    moves = moves.filter(move => checkMarginsX(move) && !currentMoves.includes(move))
+
+    return currentMoves.concat(moves)
 }
 
 function getHorseMoves(currentMoves, pieces, square) {
@@ -320,7 +312,7 @@ function getHorseMoves(currentMoves, pieces, square) {
         (!pieces.includes(move) && checkMarginsX(move) && !currentMoves.includes(move))
     )
 
-    return moves
+    return currentMoves.concat(moves)
 }
 
 function getDiagonalsMoves(currentMoves, pieces, piecesAnotherTurn, square) {
@@ -336,20 +328,9 @@ function getDiagonalsMoves(currentMoves, pieces, piecesAnotherTurn, square) {
     return: possible piece movements(array)
     */
 
-    let moves = []
     let segmentDirections = [-17, -15, 15, 17]
 
-    moves = moves.concat(
-        getSegments(
-            currentMoves,
-            pieces,
-            piecesAnotherTurn,
-            square,
-            segmentDirections
-        )
-    )
-
-    return moves
+    return getSegments(currentMoves, pieces, piecesAnotherTurn, square, segmentDirections)
 }
 
 function getStraightLineMoves(currentMoves, pieces, piecesAnotherTurn, square) {
@@ -365,20 +346,9 @@ function getStraightLineMoves(currentMoves, pieces, piecesAnotherTurn, square) {
     return: possible piece movements(array)
     */
 
-    let moves = []
     let segmentDirections = [-16, -1, 1, 16]
 
-    moves = moves.concat(
-        getSegments(
-            currentMoves,
-            pieces,
-            piecesAnotherTurn,
-            square,
-            segmentDirections
-        )
-    )
-
-    return moves
+    return getSegments(currentMoves, pieces, piecesAnotherTurn, square, segmentDirections)
 }
 
 function getSegments(currentMoves, pieces, piecesAnotherTurn, square, segmentDirections) {
@@ -396,23 +366,20 @@ function getSegments(currentMoves, pieces, piecesAnotherTurn, square, segmentDir
     return: possible piece movements(array)
     */
 
-    let moves = []
+    let moves = currentMoves
     let direction
 
     segmentDirections.map(goTo => {
 
-        if (goTo == -17 || goTo == -1 || goTo == 15) {
-            direction = -1
-        } else {
+        (goTo == -17 || goTo == -1 || goTo == 15) ? direction = -1 :
             (goTo == 16 || goTo == -16) ? direction = 0 : direction = 1
-        }
 
         let move = square + goTo
         let nextStep = checkMarginsY(square, direction)
 
         while (nextStep && checkMarginsX(move) && !pieces.includes(move)) {
 
-            if (!currentMoves.includes(move)) moves.push(move)
+            if (!moves.includes(move)) moves.push(move)
 
             nextStep = (!piecesAnotherTurn.includes(move) && checkMarginsY(move, direction))
 
@@ -627,7 +594,7 @@ function checkMarginsY(square, yDirection) {
 
         case 1:
             return (square % 16) < 15 ? true : false
-        
+
         case 0:
             return true
     }
@@ -640,6 +607,9 @@ function getMoveCoords(move) {
     return: corresponding rows and columns of each square(JSON)
     */
 
+    const getCol = (square) => square % 16
+    const getRow = (square) => (square - getCol(square)) / 16
+
     return {
         from_col: getCol(move.pieceToMove),
         from_row: getRow(move.pieceToMove),
@@ -648,18 +618,11 @@ function getMoveCoords(move) {
     }
 }
 
-function getCol(square) {
-    return square % 16
-}
-
-function getRow(square) {
-    return (square - getCol(square)) / 16
-}
-
 function printBoard(board) {
 
     const line = '--------------------------------------'
     let print = ''
+
     console.log(line)
     print = ''
 
